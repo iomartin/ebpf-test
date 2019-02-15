@@ -104,7 +104,7 @@ static int execute()
     volatile int *ret_ptr = (int32_t*) (cfg.ebpf_buffer + EBPF_RET_OFFSET);
 
     *ready_ptr = EBPF_NOT_READY;
-    *control_prog_ptr = EBPF_READY;
+    *control_prog_ptr = EBPF_START;
 
     /* Wait until eBPF program finishes */
     while (!*ready_ptr);
