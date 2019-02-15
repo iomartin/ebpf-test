@@ -25,7 +25,7 @@ CFLAGS=-std=gnu99 -g -O2 -fPIC -Wall -Werror -I$(LIBARGCONFIGDIR)/inc
 DEPFLAGS= -MT $@ -MMD -MP -MF $(OBJDIR)/$*.d
 LDLIBS+= -lpthread
 
-EXE=p2pmem-test
+EXE=ebpf-test
 SRCS=$(wildcard src/*.c)
 OBJS=$(addprefix $(OBJDIR)/, $(patsubst %.c,%.o, $(SRCS)))
 
