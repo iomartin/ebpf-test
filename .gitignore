@@ -2,3 +2,5 @@ ebpf-test
 build
 *~
 *.swp
+test/test.out
+test/test.o

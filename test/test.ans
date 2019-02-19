@@ -1,0 +1,21 @@
+Running ebpf-test. Parameters:
+NVMe device: /dev/nvme0n1
+p2pmem device: /dev/p2pmem0
+eBPF device: /dev/pci_ubpf0
+eBPF program: test/test.o
+data file: test/test.dat
+number of chunks: 10
+chunk size: 4096
+
+Iter	Result
+0	0xf92fb58f
+1	0x2f207881
+2	0x831db384
+3	0xab993020
+4	0xe97ffa68
+5	0x57954f74
+6	0x9a28f137
+7	0xe33e6e1c
+8	0x96546a5b
+9	0xe154da55
+Elapsed time: 0.003645s
