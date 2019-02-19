@@ -168,7 +168,6 @@ static void load_data(int offset)
 
     ssize_t* mem_len_ptr = (ssize_t*) (cfg.ebpf_buffer + EBPF_MEM_LEN_OFFSET);
     *mem_len_ptr = count;
-    *mem_len_ptr = 17;
 }
 
 static void run()
