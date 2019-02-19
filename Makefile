@@ -23,7 +23,7 @@ LIBARGCONFIGDIR=libargconfig
 CPPFLAGS=-Iinc -Ibuild
 CFLAGS=-std=gnu99 -g -O2 -fPIC -Wall -Werror -I$(LIBARGCONFIGDIR)/inc
 DEPFLAGS= -MT $@ -MMD -MP -MF $(OBJDIR)/$*.d
-LDLIBS+= -lpthread
+LDLIBS+= -lebpf-offload
 
 EXE=ebpf-test
 SRCS=$(wildcard src/*.c)

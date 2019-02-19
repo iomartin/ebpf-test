@@ -17,6 +17,9 @@ This utility does the following steps:
 4. Execute the program.
 5. Repeat 3-4 `chunk` times.
 
+# Dependencies
+[libebpf-offload](https://github.com/iomartin/libebpf-offload)
+
 # Example
 
 1. First, create an eBPF program
@@ -59,4 +62,3 @@ This utility does the following steps:
     0008004 5231 020e
     0009004 20a2 8d0a
     ```
-

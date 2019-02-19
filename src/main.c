@@ -38,6 +38,8 @@
 #include <argconfig/suffix.h>
 #include <argconfig/timing.h>
 
+#include <ebpf-offload.h>
+
 #include "version.h"
 
 #define KB 1024
@@ -71,24 +73,17 @@ const char *def_str = "default string";
 const char *desc = "Perform p2pmem and NVMe CMB testing (ver=" VERSION ")";
 
 static struct {
-    int nvme_fd;
-    const char *nvme_filename;
-    int p2pmem_fd;
-    const char *p2pmem_filename;
-    int ebpf_fd;
-    const char *ebpf_filename;
-    int prog_fd;
-    const char *prog_filename;
-    int data_fd;
-    const char *data_filename;
+    const char *nvme;
+    const char *p2pmem;
+    const char *ebpf;
+    const char *prog;
+    const char *data;
     void     *p2pmem_buffer;
     size_t   p2pmem_size;
     char     *ebpf_buffer;
     size_t   ebpf_size;
     size_t   chunk_size;
     size_t   chunks;
-    long     page_size;
-    uint64_t rsize;
     struct timeval time_start;
     struct timeval time_end;
 } cfg = {
@@ -97,117 +92,35 @@ static struct {
     .ebpf_size      = EBPF_SIZE,
 };
 
-static int execute()
-{
-    int *control_prog_ptr = (int32_t*) (cfg.ebpf_buffer + EBPF_CONTROL_PROG_OFFSET);
-    volatile int *ready_ptr = (int32_t*) (cfg.ebpf_buffer + EBPF_READY_OFFSET);
-    volatile int *ret_ptr = (int32_t*) (cfg.ebpf_buffer + EBPF_RET_OFFSET);
-
-    *ready_ptr = EBPF_NOT_READY;
-    *control_prog_ptr = EBPF_START;
-
-    /* Wait until eBPF program finishes */
-    while (!*ready_ptr);
-
-    return *ret_ptr;
-}
-
-/* Copy the 'data' file to offset 0 of the NVMe SSD */
-static void write_data()
-{
-    void *buf = mmap(NULL, cfg.p2pmem_size, PROT_READ, MAP_SHARED, cfg.data_fd, 0);
-    if (buf == MAP_FAILED) {
-        perror("mmap");
-        exit(EXIT_FAILURE);
-    }
-
-    ssize_t count = write(cfg.nvme_fd, buf, cfg.p2pmem_size);
-    if (count != cfg.p2pmem_size) {
-        if (count == -1) {
-            perror("write");
-        }
-        fprintf(stderr, "Copying %s to %s failed. Wanted: %lu bytes. Transferred: %lu\n",
-                cfg.data_filename, cfg.nvme_filename, cfg.p2pmem_size, count);
-        exit(EXIT_FAILURE);
-    }
-    munmap(buf, cfg.p2pmem_size);
-}
-
-/* Write program (and it's length) to the eBPF device */
-static void load_program()
-{
-    /* Get program size */
-    int size = lseek(cfg.prog_fd, 0, SEEK_END);
-    lseek(cfg.prog_fd, 0, SEEK_SET);
-
-    int* prog_len_ptr = (int32_t*) (cfg.ebpf_buffer + EBPF_PROG_LEN_OFFSET);
-    void *prog_ptr = cfg.ebpf_buffer + EBPF_PROG_OFFSET;
-
-    /* Write to device */
-    *prog_len_ptr = size;
-    size_t bytes = read(cfg.prog_fd, prog_ptr, size);
-    if (bytes != size) {
-        fprintf(stderr, "Copying %s to %s failed. Program length: %d. Bytes transferred: %lu.\n",
-                cfg.prog_filename, cfg.ebpf_filename, size, bytes);
-        exit(EXIT_FAILURE);
-    }
-}
-
-/* DMA 'chunk_size' bytes from the NVMe SSD to the p2pmem device */
-static void load_data(int offset)
-{
-    ssize_t count = pread(cfg.nvme_fd, cfg.p2pmem_buffer, cfg.chunk_size, offset);
-    if (count != cfg.chunk_size) {
-        if (count == -1) {
-            perror("pread");
-        }
-        fprintf(stderr, "DMAing to %s failed. Chunk size: %lu. Bytes transferred: %lu",
-                cfg.nvme_filename, cfg.chunk_size, count);
-        exit(EXIT_FAILURE);
-    }
-
-    ssize_t* mem_len_ptr = (ssize_t*) (cfg.ebpf_buffer + EBPF_MEM_LEN_OFFSET);
-    *mem_len_ptr = count;
-}
-
-static void run()
-{
-    if (cfg.data_fd)
-        write_data();
-    load_program();
-    fprintf(stdout, "\nIter\tResult\n");
-    for (int i = 0; i < cfg.chunks; i++) {
-        if (cfg.data_fd)
-            load_data(i * cfg.chunk_size);
-        int result = execute();
-        fprintf(stdout, "%d\t0x%08x\n", i, result);
-    }
-}
 
 int main(int argc, char **argv)
 {
+    int result[10];
     const struct argconfig_options opts[] = {
-        {"nvme", .cfg_type=CFG_FD_RDWR_DIRECT_NC,
-         .value_addr=&cfg.nvme_fd,
+        {"nvme", .cfg_type=CFG_STRING,
+         .value_addr=&cfg.nvme,
          .argument_type=required_positional,
          .force_default="/dev/nvme0n1",
          .help="NVMe device to read"},
-        {"p2pmem", .cfg_type=CFG_FD_RDWR_NC,
-         .value_addr=&cfg.p2pmem_fd,
+        {"p2pmem", .cfg_type=CFG_STRING,
+         .value_addr=&cfg.p2pmem,
          .argument_type=required_positional,
          .help="p2pmem device to use as buffer (omit for sys memory)"},
-        {"ebpf", .cfg_type=CFG_FD_RDWR_NC,
-         .value_addr=&cfg.ebpf_fd,
+        {"ebpf", .cfg_type=CFG_STRING,
+         .value_addr=&cfg.ebpf,
          .argument_type=required_positional,
          .help="device to offload eBPF program"},
-        {"prog", 'p', "", .cfg_type=CFG_FD_RD,
-         .value_addr=&cfg.prog_fd,
+        {"prog", 'p', "", .cfg_type=CFG_STRING,
+         .value_addr=&cfg.prog,
          .argument_type=required_argument,
          .help="compiled eBPF code to be offloaded"},
-        {"data", 'd', "", .cfg_type=CFG_FD_RD,
-         .value_addr=&cfg.data_fd,
+        {"data", 'd', "", .cfg_type=CFG_STRING,
+         .value_addr=&cfg.data,
          .argument_type=required_argument,
          .help="data file to be written to the NVMe SSD before starting the eBPF program."},
+        {"ebpf_size", .cfg_type=CFG_SIZE,
+        .value_addr=&cfg.ebpf_size, .argument_type=required_argument,
+        .help="eBPF device size (in bytes)"},
         {"chunks", 'c', "", CFG_LONG_SUFFIX, &cfg.chunks, required_argument,
          "number of chunks to transfer"},
         {"chunk_size", 's', "", CFG_LONG_SUFFIX, &cfg.chunk_size, required_argument,
@@ -216,46 +129,41 @@ int main(int argc, char **argv)
     };
 
     argconfig_parse(argc, argv, desc, opts, &cfg, sizeof(cfg));
-    cfg.page_size = sysconf(_SC_PAGESIZE);
-    cfg.p2pmem_size = cfg.chunk_size * cfg.chunks;;
-
-    if (ioctl(cfg.nvme_fd, BLKGETSIZE64, &cfg.rsize)) {
-        perror("ioctl-read");
-        goto fail_out;
-    }
-
-    if (cfg.p2pmem_fd && (cfg.chunk_size % cfg.page_size)){
-        fprintf(stderr, "--size must be a multiple of PAGE_SIZE in p2pmem mode.\n");
-        goto fail_out;
-    }
-
-    cfg.p2pmem_buffer = mmap(NULL, cfg.p2pmem_size, PROT_READ | PROT_WRITE, MAP_SHARED,
-              cfg.p2pmem_fd, 0);
-
-    cfg.ebpf_buffer = mmap(NULL, cfg.ebpf_size, PROT_READ | PROT_WRITE, MAP_SHARED, cfg.ebpf_fd, 0);
 
     fprintf(stdout,"Running ebpf-test. Parameters:\n");
-    fprintf(stdout,"NVMe device: %s\n", cfg.nvme_filename);
-    fprintf(stdout,"p2pmem device: %s\n", cfg.p2pmem_filename);
-    fprintf(stdout,"eBPF device: %s\n",cfg.ebpf_filename);
-    fprintf(stdout,"eBPF program: %s\n", cfg.prog_filename);
-    fprintf(stdout,"data file: %s\n", cfg.data_filename);
+    fprintf(stdout,"NVMe device: %s\n", cfg.nvme);
+    fprintf(stdout,"p2pmem device: %s\n", cfg.p2pmem);
+    fprintf(stdout,"eBPF device: %s\n",cfg.ebpf);
+    fprintf(stdout,"eBPF program: %s\n", cfg.prog);
+    fprintf(stdout,"data file: %s\n", cfg.data);
     fprintf(stdout,"number of chunks: %zd\n", cfg.chunks);
     fprintf(stdout,"chunk size: %zd\n", cfg.chunk_size);
 
+    struct ebpf_offload *ebpf = ebpf_create();
+    ebpf_set_nvme(ebpf, cfg.nvme);
+    ebpf_set_p2pmem(ebpf, cfg.p2pmem);
+    ebpf_set_ebpf(ebpf, cfg.ebpf, cfg.ebpf_size);
+    ebpf_set_prog(ebpf, cfg.prog);
+    ebpf_set_data(ebpf, cfg.data);
+    ebpf_set_chunks(ebpf, cfg.chunks);
+    ebpf_set_chunk_size(ebpf, cfg.chunk_size);
+
+    ebpf_init(ebpf);
+
     gettimeofday(&cfg.time_start, NULL);
-    run();
+    ebpf_run(ebpf, result);
     gettimeofday(&cfg.time_end, NULL);
+
+    fprintf(stdout, "\nIter\tResult\n");
+    for (int i = 0; i < 10; i++) {
+        fprintf(stdout, "%d\t0x%08x\n", i, result[i]);
+    }
 
     double elapsed_time = timeval_to_secs(&cfg.time_end) -
         timeval_to_secs(&cfg.time_start);
     fprintf(stdout, "Elapsed time: %lfs\n", elapsed_time);
 
-    munmap(cfg.p2pmem_buffer, cfg.p2pmem_size);
-    munmap(cfg.ebpf_buffer, cfg.ebpf_size);
+    ebpf_destroy(ebpf);
 
     return EXIT_SUCCESS;
-
-fail_out:
-    return EXIT_FAILURE;
 }
