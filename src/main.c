@@ -147,6 +147,7 @@ int main(int argc, char **argv)
     ebpf_set_data(ebpf, cfg.data);
     ebpf_set_chunks(ebpf, cfg.chunks);
     ebpf_set_chunk_size(ebpf, cfg.chunk_size);
+    ebpf_use_raw_io(ebpf, false);
 
     ebpf_init(ebpf);
 
