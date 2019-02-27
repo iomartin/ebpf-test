@@ -19,7 +19,9 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <libgen.h>
 #include <linux/fs.h>
+#include <mntent.h>
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -69,15 +71,14 @@
         __typeof__ (b) _b = (b);    \
         _a > _b ? _a : _b; })
 
-const char *def_str = "default string";
-const char *desc = "Perform p2pmem and NVMe CMB testing (ver=" VERSION ")";
+const char *desc = "Perform eBPF offloading testing (ver=" VERSION ")";
 
 static struct {
     const char *nvme;
     const char *p2pmem;
     const char *ebpf;
     const char *prog;
-    const char *data;
+    char *data;
     void     *p2pmem_buffer;
     size_t   p2pmem_size;
     char     *ebpf_buffer;
@@ -92,6 +93,33 @@ static struct {
     .ebpf_size      = EBPF_SIZE,
 };
 
+static char* nvme_mount_point(const char *nvme)
+{
+    char *mount_point = NULL;
+    struct mntent *ent;
+    FILE *file = setmntent("/etc/mtab", "r");
+
+    if (!file) {
+        perror("Could not open /etc/mtab");
+        exit(1);
+    }
+
+    while ((ent = getmntent(file)) != NULL) {
+        if (strcmp(ent->mnt_fsname, cfg.nvme) == 0) {
+            mount_point = malloc(strlen(ent->mnt_fsname) + 1);
+            strcpy(mount_point, ent->mnt_dir);
+            break;
+        }
+    }
+    if (ent == NULL) {
+        fprintf(stderr, "Could not find %s in /etc/mtab. Are you sure it is mounted?\n", cfg.nvme);
+        exit(1);
+    }
+
+    endmntent(file);
+
+    return mount_point;
+}
 
 int main(int argc, char **argv)
 {
@@ -129,6 +157,19 @@ int main(int argc, char **argv)
 
     argconfig_parse(argc, argv, desc, opts, &cfg, sizeof(cfg));
 
+    if (!cfg.p2pmem) {
+        fprintf(stderr, "--p2pmem is required\n");
+        exit(EXIT_FAILURE);
+    }
+    if (!cfg.ebpf) {
+        fprintf(stderr, "--ebpf is required\n");
+        exit(EXIT_FAILURE);
+    }
+    if (!cfg.prog) {
+        fprintf(stderr, "--prog is required\n");
+        exit(EXIT_FAILURE);
+    }
+
     fprintf(stdout,"Running ebpf-test. Parameters:\n");
     fprintf(stdout,"NVMe device: %s\n", cfg.nvme);
     fprintf(stdout,"p2pmem device: %s\n", cfg.p2pmem);
@@ -139,14 +180,62 @@ int main(int argc, char **argv)
     fprintf(stdout,"chunk size: %zd\n", cfg.chunk_size);
 
     struct ebpf_offload *ebpf = ebpf_create();
-    ebpf_set_nvme(ebpf, cfg.nvme);
+
+    /* Check if we need to copy the data file to the NVMe device.
+     * This should be done if both conditions below are met:
+     *   - The NVMe device is mounted;
+     *   - The file is not in the NVMe device already
+     */
+    if (cfg.data && cfg.nvme) {
+        /* Check if NVMe device is mounted */
+        char *mount_point = nvme_mount_point(cfg.nvme);
+        if (mount_point) {
+            ebpf_use_raw_io(ebpf, false);
+
+            /* Is the data file already in the NVMe device? */
+            bool need_to_copy = true;
+            char *data_abs_path = realpath(cfg.data, NULL);
+            char *path = data_abs_path;
+            do {
+                path = dirname(path);
+                if (strcmp(path, mount_point) == 0) {
+                    need_to_copy = false;
+                }
+            } while(strcmp(path, "/"));
+            free(data_abs_path);
+
+            if (need_to_copy) {
+                char *name = basename(cfg.data);
+                char *new_prog_name = malloc(strlen(mount_point) + strlen("/") + strlen(name) + 1);
+                sprintf(new_prog_name, "%s/%s", mount_point, name);
+
+                int new_prog_fd = open(new_prog_name, O_WRONLY | O_CREAT | O_TRUNC);
+                int data_fd = open(cfg.data, O_RDONLY);
+
+                char buf[4096];
+                int bytes;
+                while ((bytes = read(data_fd, buf, 4096)) > 0) {
+                    write(new_prog_fd, buf, bytes);
+                }
+                free(new_prog_name);
+            }
+            free(mount_point);
+        }
+        else {
+            ebpf_use_raw_io(ebpf, true);
+        }
+    }
+
+    if (cfg.nvme)
+        ebpf_set_nvme(ebpf, cfg.nvme);
+    if (cfg.data)
+        ebpf_set_data(ebpf, cfg.data);
+
     ebpf_set_p2pmem(ebpf, cfg.p2pmem);
     ebpf_set_ebpf(ebpf, cfg.ebpf, cfg.ebpf_size);
     ebpf_set_prog(ebpf, cfg.prog);
-    ebpf_set_data(ebpf, cfg.data);
     ebpf_set_chunks(ebpf, cfg.chunks);
     ebpf_set_chunk_size(ebpf, cfg.chunk_size);
-    ebpf_use_raw_io(ebpf, false);
 
     ebpf_init(ebpf);
 
