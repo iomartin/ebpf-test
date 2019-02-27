@@ -7,11 +7,11 @@ will execute the offloaded code, such as this [QEMU device](https://github.com/s
 (which uses this [kernel driver](https://github.com/iomartin/pci_ubpf_driver)).
 It must support the [p2pmem framework](https://github.com/Eideticom/p2pmem-pci/tree/pci-p2p-4.20.x)).
 
-The other is standard NVMe SSD.
+The other is a standard NVMe SSD. The SSD can be used either in a filesystem mode (make sure it is mounted) or as raw IO.
 
 This utility does the following steps:
 
-1. Copy a binary file (`mem.dat`) to the SSD.
+1. Copy a binary file (`mem.dat`) to the SSD (unless it is already there). In filesystem mode, the file is copied to the root of the mount point. In raw IO mode, it is copied to address 0.
 2. Load an eBPF program (`prog.o`) to the eBPF-capable device.
 3. DMA (`chunk_bytes`) from the SSD to the eBPF device.
 4. Execute the program.
