@@ -58,7 +58,7 @@ clean:
 	$(Q)$(MAKE) -C $(LIBARGCONFIGDIR) clean
 
 check: $(EXE) $(CHECK_PROG_OBJ) $(CHECK_DATA)
-	sudo ./$(EXE) $(CHECK_NVME) $(CHECK_P2PMEM) $(CHECK_PCI_UBPF) \
+	sudo ./$(EXE) --nvme $(CHECK_NVME) --p2pmem $(CHECK_P2PMEM) --ebpf $(CHECK_PCI_UBPF) \
 		--prog $(CHECK_PROG_OBJ) --data $(CHECK_DATA) \
 		--chunk_size $(CHECK_CHUNK_SIZE) --chunks $(CHECK_CHUNKS) > $(CHECK_OUT)
 	if diff $(CHECK_OUT) $(CHECK_ANS) -q -I "Elapsed.*" >/dev/null ;\
