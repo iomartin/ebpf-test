@@ -111,10 +111,6 @@ static char* nvme_mount_point(const char *nvme)
             break;
         }
     }
-    if (ent == NULL) {
-        fprintf(stderr, "Could not find %s in /etc/mtab. Are you sure it is mounted?\n", cfg.nvme);
-        exit(1);
-    }
 
     endmntent(file);
 
@@ -123,7 +119,7 @@ static char* nvme_mount_point(const char *nvme)
 
 int main(int argc, char **argv)
 {
-    int result[10];
+    int *result;
     const struct argconfig_options opts[] = {
         {"nvme", .cfg_type=CFG_STRING,
          .value_addr=&cfg.nvme,
@@ -169,6 +165,8 @@ int main(int argc, char **argv)
         fprintf(stderr, "--prog is required\n");
         exit(EXIT_FAILURE);
     }
+
+    result = malloc(cfg.chunks * sizeof(*result));
 
     fprintf(stdout,"Running ebpf-test. Parameters:\n");
     fprintf(stdout,"NVMe device: %s\n", cfg.nvme);
@@ -244,7 +242,7 @@ int main(int argc, char **argv)
     gettimeofday(&cfg.time_end, NULL);
 
     fprintf(stdout, "\nIter\tResult\n");
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < cfg.chunks; i++) {
         fprintf(stdout, "%d\t0x%08x\n", i, result[i]);
     }
 
@@ -253,6 +251,7 @@ int main(int argc, char **argv)
     fprintf(stdout, "Elapsed time: %lfs\n", elapsed_time);
 
     ebpf_destroy(ebpf);
+    free(result);
 
     return EXIT_SUCCESS;
 }
