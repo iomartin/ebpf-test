@@ -33,7 +33,7 @@ This utility does the following steps:
     ```
 3. Run the utility:
     ```sh
-    $ sudo ./ebpf-test /dev/nvme0n1 /dev/p2pmem0 /dev/pci_ubpf0 --prog prog.o --data mem.dat --chunk_size 4096  --chunks 10
+    $ sudo ./ebpf-test --nvme /dev/nvme0n1 --p2pmem /dev/p2pmem0 --ebpf /dev/pci_ubpf0 --prog prog.o --data mem.dat --chunk_size 4096 --chunks 10
     [...]
     Iter    Result
     0       0x03e6c532
