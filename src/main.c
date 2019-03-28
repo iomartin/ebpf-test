@@ -44,23 +44,6 @@
 
 #include "version.h"
 
-#define KB 1024
-#define MB (1024*1024)
-
-#define EBPF_SIZE                 (16*MB)
-#define EBPF_PROG_LEN_OFFSET      0x0
-#define EBPF_MEM_LEN_OFFSET       0x4
-#define EBPF_PROG_OFFSET          0x1000
-#define EBPF_CONTROL_PROG_OFFSET  0x100000
-#define EBPF_RET_OFFSET           0x200000
-#define EBPF_READY_OFFSET         0x200004
-#define EBPF_REGS_OFFSET          0x200008
-#define EBPF_MEM_OFFSET           0x800000
-#define EBPF_START                0x1
-#define EBPF_NOT_READY            0x0
-#define EBPF_READY                0x1
-
-
 #define min(a, b)                \
     ({ __typeof__ (a) _a = (a);        \
         __typeof__ (b) _b = (b);    \
@@ -90,7 +73,7 @@ static struct {
 } cfg = {
     .chunk_size     = 4096,
     .chunks         = 10,
-    .ebpf_size      = EBPF_SIZE,
+    .ebpf_size      = EBPF_BAR_SIZE,
 };
 
 static char* nvme_mount_point(const char *nvme)

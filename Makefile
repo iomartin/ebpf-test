@@ -68,6 +68,22 @@ check: $(EXE) $(CHECK_PROG_OBJ) $(CHECK_DATA)
 		echo "  CHECK Fail" ; false ; \
 	fi
 
+run: $(EXE) $(CHECK_PROG_OBJ) $(CHECK_DATA)
+	sudo ./$(EXE) --nvme $(CHECK_NVME) --p2pmem $(CHECK_P2PMEM) --ebpf $(CHECK_PCI_UBPF) \
+		--prog $(CHECK_PROG_OBJ) --data $(CHECK_DATA) \
+		--chunk_size $(CHECK_CHUNK_SIZE) --chunks $(CHECK_CHUNKS)
+
+debug: $(EXE) $(CHECK_PROG_OBJ) $(CHECK_DATA)
+	sudo gdb --args ./$(EXE) --nvme $(CHECK_NVME) --p2pmem $(CHECK_P2PMEM) --ebpf $(CHECK_PCI_UBPF) \
+		--prog $(CHECK_PROG_OBJ) --data $(CHECK_DATA) \
+		--chunk_size $(CHECK_CHUNK_SIZE) --chunks $(CHECK_CHUNKS)
+
+valgrind: $(EXE) $(CHECK_PROG_OBJ) $(CHECK_DATA)
+	sudo valgrind ./$(EXE) --nvme $(CHECK_NVME) --p2pmem $(CHECK_P2PMEM) --ebpf $(CHECK_PCI_UBPF) \
+		--prog $(CHECK_PROG_OBJ) --data $(CHECK_DATA) \
+		--chunk_size $(CHECK_CHUNK_SIZE) --chunks $(CHECK_CHUNKS)
+
+
 $(CHECK_PROG_OBJ): $(CHECK_PROG)
 	$(CLANG) -target bpf -c $^ -o $@
 
