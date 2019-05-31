@@ -34,14 +34,8 @@ CLANG=clang
 CHECK_NVME=/dev/nvme0n1
 CHECK_P2PMEM=/dev/p2pmem0
 CHECK_PCI_UBPF=/dev/pci_ubpf0
-CHECK_PROG=test/test.c
-CHECK_PROG_OBJ=$(CHECK_PROG:.c=.o)
-CHECK_DATA=test/test.dat
-CHECK_CHUNK_SIZE=4096
-CHECK_CHUNKS=10
-CHECK_OUT=test/test.out
-CHECK_ANS=test/test.ans
 
+TESTDIR=test
 
 ifneq ($(V), 1)
 Q=@
@@ -52,16 +46,29 @@ endif
 
 compile: $(EXE)
 
+check: check_simple check_count
+
 clean:
 	@$(NQ) echo "  CLEAN  $(EXE)"
-	$(Q)rm -rf $(EXE) build *~ ./src/*~ $(CHECK_PROG_OBJ) $(CHECK_OUT)
+	$(Q)rm -rf $(EXE) build *~ ./src/*~ $(TESTDIR)/*.o $(TESTDIR)/*.out
 	$(Q)$(MAKE) -C $(LIBARGCONFIGDIR) clean
 
-check: $(EXE) $(CHECK_PROG_OBJ) $(CHECK_DATA)
+check_simple: $(EXE) test/simple.o test/simple.dat
 	sudo ./$(EXE) --nvme $(CHECK_NVME) --p2pmem $(CHECK_P2PMEM) --ebpf $(CHECK_PCI_UBPF) \
-		--prog $(CHECK_PROG_OBJ) --data $(CHECK_DATA) \
-		--chunk_size $(CHECK_CHUNK_SIZE) --chunks $(CHECK_CHUNKS) > $(CHECK_OUT)
-	if diff $(CHECK_OUT) $(CHECK_ANS) -q -I "Elapsed.*" >/dev/null ;\
+		--prog test/simple.o --data test/simple.dat \
+		--chunk_size 4096 --chunks 10 > $(TESTDIR)/simple.out
+	if diff $(TESTDIR)/simple.ans $(TESTDIR)/simple.out -q -I "Elapsed.*" >/dev/null ;\
+	then \
+		echo "  CHECK Pass" ;\
+	else \
+		echo "  CHECK Fail" ; false ; \
+	fi
+
+check_count: $(EXE) $(TESTDIR)/count.o test/count.dat
+	sudo ./$(EXE) --nvme $(CHECK_NVME) --p2pmem $(CHECK_P2PMEM) --ebpf $(CHECK_PCI_UBPF) \
+		--prog test/count.o --data test/count.dat \
+		--chunk_size `stat -c %s test/count.dat` --chunks 1 > $(TESTDIR)/count.out
+	if diff $(TESTDIR)/count.ans $(TESTDIR)/count.out -q -I "Elapsed.*" >/dev/null ;\
 	then \
 		echo "  CHECK Pass" ;\
 	else \
@@ -84,9 +91,8 @@ valgrind: $(EXE) $(CHECK_PROG_OBJ) $(CHECK_DATA)
 		--chunk_size $(CHECK_CHUNK_SIZE) --chunks $(CHECK_CHUNKS)
 
 
-$(CHECK_PROG_OBJ): $(CHECK_PROG)
+$(TESTDIR)/%.o: $(TESTDIR)/%.c
 	$(CLANG) -target bpf -c $^ -o $@
-
 
 $(OBJDIR)/version.h $(OBJDIR)/version.mk: FORCE $(OBJDIR)
 	@$(SHELL_PATH) ./VERSION-GEN

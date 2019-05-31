@@ -62,3 +62,25 @@ This utility does the following steps:
     0008004 5231 020e
     0009004 20a2 8d0a
     ```
+
+# A more elaborate program
+Sample program `simple.c` counts how many times a byte appears in an array.
+Because eBPF only allows one parameter to the entry function, we need to encapsulate the key, the array and the array length in a single data structure.
+The convention used is that the first 4 bytes are the length, the 5th byte is the key and everything after that is the array.
+
+To generate your own input, do the following:
+    ```sh
+    length=100000
+    key=0x68
+
+    perl -e "print pack('L', $length)" > count.dat
+    perl -e "print pack('c', $key)" >> count.dat
+    dd if=/dev/urandom bs=$size count=1 >> count.dat
+    ```
+
+The answer can be checked with
+    ```sh
+    key=0x68
+    data_file=count.dat
+    hexdump -e '16/1 "0x%02x " "\n"' $data_file | grep $key -o | wc -l
+    ```

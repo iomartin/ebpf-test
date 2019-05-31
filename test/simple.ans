@@ -2,8 +2,8 @@ Running ebpf-test. Parameters:
 NVMe device: /dev/nvme0n1
 p2pmem device: /dev/p2pmem0
 eBPF device: /dev/pci_ubpf0
-eBPF program: test/test.o
-data file: test/test.dat
+eBPF program: test/simple.o
+data file: test/simple.dat
 number of chunks: 10
 chunk size: 4096
 
