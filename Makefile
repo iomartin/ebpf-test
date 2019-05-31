@@ -54,10 +54,10 @@ clean:
 	$(Q)$(MAKE) -C $(LIBARGCONFIGDIR) clean
 
 check_simple: $(EXE) test/simple.o test/simple.dat
-	sudo ./$(EXE) --nvme $(CHECK_NVME) --p2pmem $(CHECK_P2PMEM) --ebpf $(CHECK_PCI_UBPF) \
+	sudo ./$(EXE) --nvme $(CHECK_NVME) --ebpf $(CHECK_PCI_UBPF) \
 		--prog test/simple.o --data test/simple.dat \
 		--chunk_size 4096 --chunks 10 > $(TESTDIR)/simple.out
-	if diff $(TESTDIR)/simple.ans $(TESTDIR)/simple.out -q -I "Elapsed.*" >/dev/null ;\
+	if diff $(TESTDIR)/simple.ans $(TESTDIR)/simple.out -q -I "#.*" >/dev/null ;\
 	then \
 		echo "  CHECK Pass" ;\
 	else \
@@ -65,10 +65,10 @@ check_simple: $(EXE) test/simple.o test/simple.dat
 	fi
 
 check_count: $(EXE) $(TESTDIR)/count.o test/count.dat
-	sudo ./$(EXE) --nvme $(CHECK_NVME) --p2pmem $(CHECK_P2PMEM) --ebpf $(CHECK_PCI_UBPF) \
+	sudo ./$(EXE) --nvme $(CHECK_NVME) --ebpf $(CHECK_PCI_UBPF) \
 		--prog test/count.o --data test/count.dat \
 		--chunk_size `stat -c %s test/count.dat` --chunks 1 > $(TESTDIR)/count.out
-	if diff $(TESTDIR)/count.ans $(TESTDIR)/count.out -q -I "Elapsed.*" >/dev/null ;\
+	if diff $(TESTDIR)/count.ans $(TESTDIR)/count.out -q -I "#.*" >/dev/null ;\
 	then \
 		echo "  CHECK Pass" ;\
 	else \

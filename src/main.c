@@ -136,10 +136,6 @@ int main(int argc, char **argv)
 
     argconfig_parse(argc, argv, desc, opts, &cfg, sizeof(cfg));
 
-    if (!cfg.p2pmem) {
-        fprintf(stderr, "--p2pmem is required\n");
-        exit(EXIT_FAILURE);
-    }
     if (!cfg.ebpf) {
         fprintf(stderr, "--ebpf is required\n");
         exit(EXIT_FAILURE);
@@ -151,14 +147,14 @@ int main(int argc, char **argv)
 
     result = malloc(cfg.chunks * sizeof(*result));
 
-    fprintf(stdout,"Running ebpf-test. Parameters:\n");
-    fprintf(stdout,"NVMe device: %s\n", cfg.nvme);
-    fprintf(stdout,"p2pmem device: %s\n", cfg.p2pmem);
-    fprintf(stdout,"eBPF device: %s\n",cfg.ebpf);
-    fprintf(stdout,"eBPF program: %s\n", cfg.prog);
-    fprintf(stdout,"data file: %s\n", cfg.data);
-    fprintf(stdout,"number of chunks: %zd\n", cfg.chunks);
-    fprintf(stdout,"chunk size: %zd\n", cfg.chunk_size);
+    fprintf(stdout,"# Running ebpf-test. Parameters:\n");
+    fprintf(stdout,"# NVMe device: %s\n", cfg.nvme);
+    fprintf(stdout,"# p2pmem device: %s\n", cfg.p2pmem);
+    fprintf(stdout,"# eBPF device: %s\n",cfg.ebpf);
+    fprintf(stdout,"# eBPF program: %s\n", cfg.prog);
+    fprintf(stdout,"# data file: %s\n", cfg.data);
+    fprintf(stdout,"# number of chunks: %zd\n", cfg.chunks);
+    fprintf(stdout,"# chunk size: %zd\n", cfg.chunk_size);
 
     struct ebpf_offload *ebpf = ebpf_create();
 
@@ -212,7 +208,8 @@ int main(int argc, char **argv)
     if (cfg.data)
         ebpf_set_data(ebpf, cfg.data);
 
-    ebpf_set_p2pmem(ebpf, cfg.p2pmem);
+    if (cfg.p2pmem)
+        ebpf_set_p2pmem(ebpf, cfg.p2pmem);
     ebpf_set_ebpf(ebpf, cfg.ebpf, cfg.ebpf_size);
     ebpf_set_prog(ebpf, cfg.prog);
     ebpf_set_chunks(ebpf, cfg.chunks);
@@ -231,7 +228,7 @@ int main(int argc, char **argv)
 
     double elapsed_time = timeval_to_secs(&cfg.time_end) -
         timeval_to_secs(&cfg.time_start);
-    fprintf(stdout, "Elapsed time: %lfs\n", elapsed_time);
+    fprintf(stdout, "# Elapsed time: %lfs\n", elapsed_time);
 
     ebpf_destroy(ebpf);
     free(result);
