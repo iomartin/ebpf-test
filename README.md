@@ -24,8 +24,8 @@ This utility does the following steps:
 
 1. First, create an eBPF program
     ```sh
-    $ echo "int func (int *mem) { return mem[1]; }" > prog.c
-    $ clang -O2 -target bpf -c prog.c -o prog.o
+    $ echo "int func (int *mem) { return mem[1]; }" > simple.c
+    $ clang -O2 -target bpf -c simple.c -o simple.o
     ```
 2. Then, create a data file
     ```sh
@@ -33,7 +33,7 @@ This utility does the following steps:
     ```
 3. Run the utility:
     ```sh
-    $ sudo ./ebpf-test --nvme /dev/nvme0n1 --p2pmem /dev/p2pmem0 --ebpf /dev/pci_ubpf0 --prog prog.o --data mem.dat --chunk_size 4096 --chunks 10
+    $ sudo ./ebpf-test --nvme /dev/nvme0n1 --p2pmem /dev/p2pmem0 --ebpf /dev/pci_ubpf0 --prog simple.o --data mem.dat --chunk_size 4096 --chunks 10
     [...]
     Iter    Result
     0       0x03e6c532
@@ -64,7 +64,7 @@ This utility does the following steps:
     ```
 
 # A more elaborate program
-Sample program `simple.c` counts how many times a byte appears in an array.
+Sample program `count.c` counts how many times a byte appears in an array.
 Because eBPF only allows one parameter to the entry function, we need to encapsulate the key, the array and the array length in a single data structure.
 The convention used is that the first 4 bytes are the length, the 5th byte is the key and everything after that is the array.
 
@@ -77,10 +77,12 @@ To generate your own input, do the following:
     perl -e "print pack('c', $key)" >> count.dat
     dd if=/dev/urandom bs=$size count=1 >> count.dat
     ```
+The answer can be checked with the following:
 
-The answer can be checked with
     ```sh
     key=0x68
     data_file=count.dat
     hexdump -e '16/1 "0x%02x " "\n"' $data_file | grep $key -o | wc -l
     ```
+
+Note that the above will count one more than what the eBPF will. The reason is that the command above will count the key itself (the 5th byte of the data file).
