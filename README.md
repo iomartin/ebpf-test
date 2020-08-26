@@ -69,20 +69,26 @@ Because eBPF only allows one parameter to the entry function, we need to encapsu
 The convention used is that the first 4 bytes are the length, the 5th byte is the key and everything after that is the array.
 
 To generate your own input, do the following:
-    ```sh
-    length=100000
-    key=0x68
+```sh
+length=100000
+key=0x68
 
-    perl -e "print pack('L', $length)" > count.dat
-    perl -e "print pack('c', $key)" >> count.dat
-    dd if=/dev/urandom bs=$size count=1 >> count.dat
-    ```
+perl -e "print pack('L', $length)" > count.dat
+perl -e "print pack('c', $key)" >> count.dat
+dd if=/dev/urandom bs=$size count=1 >> count.dat
+```
+
+To run:
+```sh
+sudo ./ebpf-test --nvme /dev/nvme0n1 --p2pmem /dev/p2pmem0 --ebpf /dev/pci_ubpf0 --prog count.o --data count.dat --chunk_size 100005 --chunks 1
+```
+
 The answer can be checked with the following:
 
-    ```sh
-    key=0x68
-    data_file=count.dat
-    hexdump -e '16/1 "0x%02x " "\n"' $data_file | grep $key -o | wc -l
-    ```
+```sh
+key=0x68
+data_file=count.dat
+hexdump -e '16/1 "0x%02x " "\n"' $data_file | grep $key -o | wc -l
+```
 
 Note that the above will count one more than what the eBPF will. The reason is that the command above will count the key itself (the 5th byte of the data file).
